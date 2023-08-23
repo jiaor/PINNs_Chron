@@ -70,22 +70,11 @@ class PINN3D(PINN1D):
         super().__init__(*args, **kwargs)
         # X is defined as (time, x, y, z)
         self.transform = tf.keras.layers.Lambda(
-            lambda x: x[:, 0:1] * (Tbot - T_grad(x[:, 0:1], x[:, 1:2], x[:, 2:3]) * x[:, 3:4])   
+            lambda x: x[:, 0:1] * (self.Tbot - self.Tgrad(x[:, 0:1], x[:, 1:2], x[:, 2:3]) * x[:, 3:4])   
         )
-
-    # do I need to add the call function here?
-    # can I do it like this?
-#     def call(self, X):
-#         super().call(self, X)
         
-#     def call(self, X):
-#         """Forward-pass through NN."""
-#         Y = self.scale(X)
-#         for i in range(self.num_hidden_layers):
-#             Y = self.hidden[i](Y)
-            
-#         Y = self.transform(Y)
-#         return self.out(Y)
+    def Tgrad(self, x, y, z):
+        raise NotImplementedError('geothermal gradient function needs to be defined')
 
 ##############################
 class PINN1DSolver():
@@ -93,6 +82,7 @@ class PINN1DSolver():
         self.model = model
         self.start_time = datetime.datetime.now()
         self.runname = self.start_time.strftime("%y%m%d_%H%M")
+        self.savepath = 'saved_model'
         
         #default values for kappa and uplift rate
         self.kappa = 25.
@@ -184,7 +174,7 @@ class PINN1DSolver():
                                method=method, beta=2, grain_radius=grain_radius)
         return age
 
-    def solve_with_Adam(self, optimizer, X, T, N=1000, savepath='saved_model', echofreq=100, savefreq=1000):
+    def solve_with_Adam(self, optimizer, X, T, N=1000, echofreq=100, savefreq=1000):
         """This method performs a gradient descent type optimization."""
         @tf.function
         def train_step():
@@ -198,9 +188,9 @@ class PINN1DSolver():
             self.current_loss = loss.numpy()
             self.phi_heat = phi_heat.numpy()
             self.phi_bound = phi_bound.numpy()
-            self.callback(savepath=savepath, echofreq=echofreq, savefreq=savefreq)
+            self.callback(echofreq=echofreq, savefreq=savefreq)
                  
-    def callback(self, xr=None, savepath='saved_model', echofreq=100, savefreq=1000):
+    def callback(self, xr=None, echofreq=100, savefreq=1000):
         self.iter += 1
         self.loss_hist.append(self.current_loss)
         self.heat_hist.append(self.phi_heat)
@@ -211,16 +201,17 @@ class PINN1DSolver():
                         self.runname, self.iter, self.current_loss,
                 (datetime.datetime.now()-self.start_time).seconds))
             if self.iter % savefreq == 0:
-                path = savepath + '/'+ self.runname + '/' + str(self.iter) + '/'    
+                path = self.savepath + '/'+ self.runname + '/' + str(self.iter) + '/'    
                 tf.saved_model.save(self.model, path)
-                np.save(savepath + '/'+ self.runname + '/loss_hist', self.loss_hist)
-                np.save(savepath + '/'+ self.runname + '/heat_hist', self.heat_hist)
-                np.save(savepath + '/'+ self.runname + '/bound_hist', self.bound_hist)
+                np.save(self.savepath + '/'+ self.runname + '/loss_hist', self.loss_hist)
+                np.save(self.savepath + '/'+ self.runname + '/heat_hist', self.heat_hist)
+                np.save(self.savepath + '/'+ self.runname + '/bound_hist', self.bound_hist)
         
 ##############################
 class PINN3DSolver(PINN1DSolver):    
     def __init__(self, model, X_r):
-        super().__init__(*args, **kwargs)
+        super().__init__(model, X_r,)
+        self.savepath = 'saved_model3d'
         # Store collocation points
         self.t = X_r[:, 0:1]
         self.x = X_r[:, 1:2]
