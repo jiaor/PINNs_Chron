@@ -1,0 +1,1 @@
+This repository archives the codes used for examples presented in Jiao R., Cai, S., and Braun J. (2024) Solving crustal heat transfer for thermochronology using physics-informed neural networks. Geochronology, https://doi.org/10.5194/gchron-2023-24.
